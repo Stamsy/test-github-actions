@@ -1,56 +1,48 @@
-name: Docker Nightly Image CI
-run-name: Build ${{ inputs.branch }} - ${{ inputs.user }}
+name: Test Workflow
 
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: 'GitHub branch to create image off.'
-        required: true
-        default: 'master'
-      tag:
-        description: 'Name of the docker tag to create.'
-        required: true
-        default: 'nightly'
-      merge-master:
-        description: 'Merge with master.'
-        type: boolean
-        required: true
-        default: false
-      callback-url:
-        description: 'URL to call after workflow completes.'
+      resumeUrl:
+        description: 'URL to call to notify n8n that the workflow has completed.'
         required: false
         default: ''
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4.1.1
-        with:
-          ref: ${{ github.event.inputs.branch || 'master' }}
 
-      - name: Build and push to DockerHub
-        uses: docker/build-push-action@v5.1.0
-        with:
-          context: .
-          file: ./docker/images/n8n-custom/Dockerfile
-          build-args: |
-            N8N_RELEASE_TYPE=nightly
-          platforms: linux/amd64,linux/arm64
-          provenance: false
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ secrets.DOCKER_USERNAME }}/n8n:${{ env.N8N_TAG }}
-
-      - name: Call Callback URL - optionally
+      - name: Debug Repository Contents
         run: |
-          if [[ "${{github.event.inputs.callback-url}}" != "" ]]; then
-            curl -v -X POST -d 'status=success&run_id=${{ github.run_id }}' ${{github.event.inputs.callback-url}}
-          else
-            echo "No callback URL provided."
+          echo "Repository contents:"
+          ls -la
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          echo "Installing dependencies..."
+          npm install
+
+      - name: Run Tests
+        run: |
+          echo "Running tests..."
+          npm test
+
+      - name: Notify n8n to resume workflow
+        if: always()  # Ensure this step runs even if previous steps fail
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            RESUME_URL="${{ github.event.inputs.resumeUrl }}"
+            if [ -n "$RESUME_URL" ]; then
+              echo "Calling n8n webhook URL: $RESUME_URL"
+              curl -X POST "$RESUME_URL" -H "Content-Type: application/json" -d '{"status": "completed"}'
+            fi
           fi
-        shell: bash
