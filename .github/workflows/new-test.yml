@@ -36,6 +36,11 @@ jobs:
           echo "Running tests..."
           npm test
 
+      - name: Wait for 60 seconds
+        run: |
+          echo "Waiting for 60 seconds..."
+          sleep 60
+
       - name: Notify n8n to resume workflow
         if: always()  # Ensure this step runs even if previous steps fail
         run: |
