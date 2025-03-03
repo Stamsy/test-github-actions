@@ -37,7 +37,7 @@ jobs:
           npm test
 
       - name: Notify n8n to resume workflow
-        if: always()  # Ensure this step runs even if previous steps fail
+        if: always()
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             RESUME_URL="${{ github.event.inputs.resumeUrl }}"
